@@ -1,0 +1,4 @@
+enabled: true
+repository: freenow/secrets-store-csi-driver-provider-spring-cloud-config
+tag: HEAD
+imagePullPolicy: Always

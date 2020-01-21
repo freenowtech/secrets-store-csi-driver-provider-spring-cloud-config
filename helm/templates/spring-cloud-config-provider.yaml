@@ -1,0 +1,44 @@
+{{- if .Values.enabled }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: csi-secrets-store-provider-spring-cloud-config
+  name: csi-secrets-store-provider-spring-cloud-config
+spec:
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: csi-secrets-store-provider-spring-cloud-config
+  template:
+    metadata:
+      labels:
+        app: csi-secrets-store-provider-spring-cloud-config
+    spec:
+      tolerations:
+      containers:
+        - name: provider-spring-cloud-config-installer
+          image: "{{ .Values.repository }}:{{ .Values.tag }}"
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          resources:
+            requests:
+              cpu: 50m
+              memory: 100Mi
+            limits:
+              cpu: 50m
+              memory: 100Mi
+          env:
+            # set TARGET_DIR env var and mount the same directory to to the container
+            - name: TARGET_DIR
+              value: "/etc/kubernetes/secrets-store-csi-providers"
+          volumeMounts:
+            - mountPath: "/etc/kubernetes/secrets-store-csi-providers"
+              name: providervol
+      volumes:
+        - name: providervol
+          hostPath:
+              path: "/etc/kubernetes/secrets-store-csi-providers"
+      nodeSelector:
+        beta.kubernetes.io/os: linux
+{{- end }}
