@@ -22,8 +22,13 @@ build: setup
 package:
 	docker build --rm --pull -t ${CONTAINER_IMAGE} .
 
+.PHONY: test
+test:
+	ls $(PWD)
+	docker run --rm -v "$(PWD):/go/src/github.com/freenowtech/$(PROJECT_NAME)" -w "/go/src/github.com/freenowtech/$(PROJECT_NAME)" golang:1.13.4-alpine go test
+
 .PHONY: release
-release: package
+release: test package
 	docker push ${CONTAINER_IMAGE}
 ifeq (${BUILD_BRANCH},master)
 	docker tag ${CONTAINER_IMAGE} ${REGISTRY}/${PROJECT_NAME}:latest
