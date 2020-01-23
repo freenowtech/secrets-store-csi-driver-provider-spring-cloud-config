@@ -1,7 +1,7 @@
 REGISTRY = freenow
 PROJECT_NAME ?= secrets-store-csi-driver-provider-spring-cloud-config
 BUILD_GITHASH ?= $(shell git rev-parse HEAD)
-BUILD_BRANCH = $(shell git rev-parse --abbrev-ref HEAD)
+BUILD_BRANCH ?= $(shell git rev-parse --abbrev-ref HEAD)
 CONTAINER_IMAGE ?= $(REGISTRY)/$(PROJECT_NAME):$(BUILD_GITHASH)
 
 .DEFAULT_GOAL = package
@@ -30,6 +30,9 @@ test:
 .PHONY: release
 release: test package
 	docker push ${CONTAINER_IMAGE}
+
+.PHONY: release_latest
+release_latest: release
 ifeq (${BUILD_BRANCH},master)
 	docker tag ${CONTAINER_IMAGE} ${REGISTRY}/${PROJECT_NAME}:latest
 	docker push ${REGISTRY}/${PROJECT_NAME}:latest
