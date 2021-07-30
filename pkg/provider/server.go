@@ -4,32 +4,62 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
+	"io"
 	"net"
 	"os"
-
-	"google.golang.org/grpc"
+	"path"
 
 	"sigs.k8s.io/secrets-store-csi-driver/provider/v1alpha1"
 )
 
-const springGetConfigPath = "/config/"
-
 type SpringCloudConfigCSIProviderServer struct {
-	grpcServer *grpc.Server
-	listener   net.Listener
-	socketPath string
-	returnErr  error
-	errorCode  string
-	objects    []*v1alpha1.ObjectVersion
-	files      []*v1alpha1.File
+	grpcServer              *grpc.Server
+	listener                net.Listener
+	socketPath              string
+	returnErr               error
+	errorCode               string
+	springCloudConfigClient SpringCloudConfigClient
+	objects                 []*v1alpha1.ObjectVersion
+	files                   []*v1alpha1.File
+}
+
+type Attributes struct {
+	serverAddress string
+	application   string
+	profile       string
+	fileType      string
+}
+
+func (a *Attributes) verify() error {
+	if a.serverAddress == "" {
+		return fmt.Errorf("serverAddress is not set")
+	}
+
+	if a.application == "" {
+		return fmt.Errorf("application is not set")
+	}
+
+	if a.profile == "" {
+		return fmt.Errorf("profile is not set")
+	}
+
+	if a.fileType == "" {
+		return fmt.Errorf("fileType is not set")
+	}
+
+	return nil
 }
 
 // NewMocKCSIProviderServer returns a mock csi-provider grpc server
 func NewSpringCloudConfigCSIProviderServer(socketPath string) (*SpringCloudConfigCSIProviderServer, error) {
+	client := NewSpringCloudConfigClient()
 	server := grpc.NewServer()
 	s := &SpringCloudConfigCSIProviderServer{
-		grpcServer: server,
-		socketPath: socketPath,
+		springCloudConfigClient: client,
+		grpcServer:              server,
+		socketPath:              socketPath,
 	}
 	v1alpha1.RegisterCSIDriverProviderServer(server, s)
 	return s, nil
@@ -83,7 +113,8 @@ func (m *SpringCloudConfigCSIProviderServer) Stop() {
 
 // Mount implements a provider csi-provider method
 func (m *SpringCloudConfigCSIProviderServer) Mount(ctx context.Context, req *v1alpha1.MountRequest) (*v1alpha1.MountResponse, error) {
-	var attrib, secret map[string]string
+	var attrib Attributes
+	var secret map[string]string
 	var filePermission os.FileMode
 	var err error
 
@@ -102,13 +133,46 @@ func (m *SpringCloudConfigCSIProviderServer) Mount(ctx context.Context, req *v1a
 	if len(req.GetTargetPath()) == 0 {
 		return nil, fmt.Errorf("missing target path")
 	}
-	return &v1alpha1.MountResponse{
+
+	err = attrib.verify()
+	if err != nil {
+		return nil, err
+	}
+
+	fileName := fmt.Sprintf("%s-%s.%s", attrib.application, attrib.profile, attrib.fileType)
+	content, err := m.springCloudConfigClient.GetConfig(attrib)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve secrets for %s: %w", fileName, err)
+	}
+	defer content.Close()
+
+	out := &v1alpha1.MountResponse{
 		ObjectVersion: m.objects,
 		Error: &v1alpha1.Error{
 			Code: m.errorCode,
 		},
 		Files: m.files,
-	}, nil
+	}
+	file, err := os.OpenFile(path.Join(req.GetTargetPath(), fileName), os.O_RDWR|os.O_CREATE, filePermission)
+	if err != nil {
+		return nil, fmt.Errorf("secrets store csi driver failed to mount %s at %s: %w", fileName, req.GetTargetPath(), err)
+	}
+	defer file.Close()
+
+	_, err = io.Copy(file, content)
+	if err != nil {
+		return nil, fmt.Errorf("secrets store csi driver failed to mount %s at %s: %w", fileName, req.GetTargetPath(), err)
+	}
+	log.Infof("secrets store csi driver mounted %s", fileName)
+	log.Infof("mount point: %s", req.GetTargetPath())
+	//out.Files = append(out.Files, &v1alpha1.File{
+	//	Path:     path.Join(req.GetTargetPath(), fileName),
+	//	Mode:     filePermission,
+	//	Contents: nil,
+	//})
+
+	// Files should not exceed 1MiB
+	return out, nil
 }
 
 // Version implements a provider csi-provider method
