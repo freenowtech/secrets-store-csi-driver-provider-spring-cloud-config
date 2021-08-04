@@ -22,8 +22,6 @@ type SpringCloudConfigCSIProviderServer struct {
 	returnErr               error
 	errorCode               string
 	springCloudConfigClient ConfigClient
-	objects                 []*v1alpha1.ObjectVersion
-	files                   []*v1alpha1.File
 }
 
 type Attributes struct {
@@ -116,11 +114,9 @@ func (m *SpringCloudConfigCSIProviderServer) Mount(ctx context.Context, req *v1a
 	defer content.Close()
 
 	out := &v1alpha1.MountResponse{
-		ObjectVersion: m.objects,
 		Error: &v1alpha1.Error{
 			Code: m.errorCode,
 		},
-		Files: m.files,
 	}
 	file, err := os.OpenFile(path.Join(req.GetTargetPath(), fileName), os.O_RDWR|os.O_CREATE, filePermission)
 	if err != nil {
