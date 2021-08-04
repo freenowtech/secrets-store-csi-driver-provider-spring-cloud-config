@@ -10,7 +10,7 @@ import (
 const springGetConfigPath = "/config/"
 
 type ConfigClient interface {
-	GetConfig(string, string, string, string) (io.ReadCloser, error)
+	GetConfig(attributes Attributes) (io.ReadCloser, error)
 }
 
 type SpringCloudConfigClient struct {
@@ -26,7 +26,7 @@ func NewSpringCloudConfigClient() SpringCloudConfigClient {
 }
 
 func (c *SpringCloudConfigClient) GetConfig(attributes Attributes) (io.ReadCloser, error) {
-	fullAddress := attributes.serverAddress + springGetConfigPath + attributes.application + "/" + attributes.profile + "." + attributes.fileType
+	fullAddress := attributes.ServerAddress + springGetConfigPath + attributes.Application + "/" + attributes.Profile + "." + attributes.FileType
 	r, err := c.client.Get(fullAddress)
 	if err != nil {
 		return nil, err

@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/freenowtech/secrets-store-csi-driver-provider-spring-cloud-config/pkg/provider"
-	log "github.com/sirupsen/logrus"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"syscall"
+
+	"github.com/freenowtech/secrets-store-csi-driver-provider-spring-cloud-config/pkg/provider"
+	log "github.com/sirupsen/logrus"
 )
 
 func main() {
