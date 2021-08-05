@@ -24,8 +24,7 @@ package:
 
 .PHONY: test
 test:
-	ls $(PWD)
-	docker run --rm -e CGO_ENABLED=0 -v "$(PWD):/go/src/github.com/freenowtech/$(PROJECT_NAME)" -w "/go/src/github.com/freenowtech/$(PROJECT_NAME)" golang:1.13.4-alpine  go test
+	docker run --rm -e CGO_ENABLED=0 -v "$(PWD):/go/src/github.com/freenowtech/$(PROJECT_NAME)" -w "/go/src/github.com/freenowtech/$(PROJECT_NAME)" golang:1.13.4-alpine  go test ./...
 
 .PHONY: release
 release: test package
