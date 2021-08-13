@@ -23,7 +23,11 @@ func main() {
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGTERM, syscall.SIGINT)
-	server.Start()
+
+	err = server.Start()
+	if err != nil {
+		log.Fatalf("error occured on server start: %v", err)
+	}
 
 	sig := <-c
 	log.Info(fmt.Sprintf("Caught signal %s, shutting down", sig))
