@@ -7,11 +7,9 @@ COPY . /go/src/github.com/freenowtech/secrets-store-csi-driver-provider-spring-c
 WORKDIR /go/src/github.com/freenowtech/secrets-store-csi-driver-provider-spring-cloud-config
 RUN make build
 
-FROM alpine:3.10.3
-RUN apk add --no-cache bash
+FROM alpine:3.14.1
 COPY --from=builder /go/src/github.com/freenowtech/secrets-store-csi-driver-provider-spring-cloud-config/secrets-store-csi-driver-provider-spring-cloud-config /bin/
-COPY --from=builder /go/src/github.com/freenowtech/secrets-store-csi-driver-provider-spring-cloud-config/install.sh /bin/install_spring-cloud-config_provider.sh
 RUN chmod a+x /bin/secrets-store-csi-driver-provider-spring-cloud-config
 
-ENTRYPOINT ["/bin/install_spring-cloud-config_provider.sh"]
+ENTRYPOINT ["/bin/secrets-store-csi-driver-provider-spring-cloud-config"]
 
