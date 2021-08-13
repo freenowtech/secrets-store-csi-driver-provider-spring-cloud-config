@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	socketPath := filepath.Join(os.Getenv("TARGET_DIR"), "scc.sock")
+	socketPath := filepath.Join(os.Getenv("TARGET_DIR"), "spring-cloud-config.sock")
 	// Delete previous socket if exists
 	_ = os.Remove(socketPath)
 
