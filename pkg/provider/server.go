@@ -25,10 +25,10 @@ type SpringCloudConfigCSIProviderServer struct {
 }
 
 type Attributes struct {
-	ServerAddress string `json:"server_address,omitempty"`
+	ServerAddress string `json:"serverAddress,omitempty"`
 	Application   string `json:"application,omitempty"`
 	Profile       string `json:"profile,omitempty"`
-	FileType      string `json:"file_type,omitempty"`
+	FileType      string `json:"fileType,omitempty"`
 }
 
 func (a *Attributes) verify() error {
@@ -113,7 +113,18 @@ func (m *SpringCloudConfigCSIProviderServer) Mount(ctx context.Context, req *v1a
 	}
 	defer content.Close()
 
+	// TODO: needs to be refactored to actually reflect the object version
+	// check out e. g. gcp provider https://github.com/GoogleCloudPlatform/secrets-store-csi-driver-provider-gcp/blob/main/server/server.go#L140
+	// currently sets the object to the repo name and the version to the env
+	objectVersions := []*v1alpha1.ObjectVersion{
+		{
+			Id:      attrib.Application,
+			Version: attrib.Profile,
+		},
+	}
+
 	out := &v1alpha1.MountResponse{
+		ObjectVersion: objectVersions,
 		Error: &v1alpha1.Error{
 			Code: m.errorCode,
 		},
