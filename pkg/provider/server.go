@@ -29,9 +29,22 @@ type Attributes struct {
 	Application   string `json:"application,omitempty"`
 	Profile       string `json:"profile,omitempty"`
 	FileType      string `json:"fileType,omitempty"`
+	Raw           []Raw  `json:"raw"`
+}
+
+type Raw struct {
+	Source string `json:"source,omitempty"`
+	Target string `json:"target,omitempty"`
 }
 
 func (a *Attributes) verify() error {
+
+	for _, item := range a.Raw {
+		if item.Source == "" || item.Target == "" {
+			return fmt.Errorf("Source or Target not set")
+		}
+	}
+
 	if a.ServerAddress == "" {
 		return fmt.Errorf("serverAddress is not set")
 	}
@@ -44,7 +57,8 @@ func (a *Attributes) verify() error {
 		return fmt.Errorf("profile is not set")
 	}
 
-	if a.FileType == "" {
+	// TODO might want to warn/info in-case only raw files were created
+	if a.FileType == "" && len(a.Raw) == 0 {
 		return fmt.Errorf("FileType is not set")
 	}
 
@@ -106,13 +120,6 @@ func (m *SpringCloudConfigCSIProviderServer) Mount(ctx context.Context, req *v1a
 		return nil, err
 	}
 
-	fileName := fmt.Sprintf("%s-%s.%s", attrib.Application, attrib.Profile, attrib.FileType)
-	content, err := m.springCloudConfigClient.GetConfig(attrib)
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve secrets for %s: %w", fileName, err)
-	}
-	defer content.Close()
-
 	// TODO: needs to be refactored to actually reflect the object version
 	// check out e. g. gcp provider https://github.com/GoogleCloudPlatform/secrets-store-csi-driver-provider-gcp/blob/main/server/server.go#L140
 	// currently sets the object to the repo name and the version to the env
@@ -129,18 +136,53 @@ func (m *SpringCloudConfigCSIProviderServer) Mount(ctx context.Context, req *v1a
 			Code: m.errorCode,
 		},
 	}
-	file, err := os.OpenFile(path.Join(req.GetTargetPath(), fileName), os.O_RDWR|os.O_CREATE, filePermission)
-	if err != nil {
-		return nil, fmt.Errorf("secrets store csi driver failed to mount %s at %s: %w", fileName, req.GetTargetPath(), err)
-	}
-	defer file.Close()
 
-	_, err = io.Copy(file, content)
-	if err != nil {
-		return nil, fmt.Errorf("secrets store csi driver failed to mount %s at %s: %w", fileName, req.GetTargetPath(), err)
+	if attrib.FileType != "" {
+		fileName := fmt.Sprintf("%s-%s.%s", attrib.Application, attrib.Profile, attrib.FileType)
+		content, err := m.springCloudConfigClient.GetConfig(attrib)
+		if err != nil {
+			return nil, fmt.Errorf("failed to retrieve secrets for %s: %w", fileName, err)
+		}
+		defer content.Close()
+
+		file, err := os.OpenFile(path.Join(req.GetTargetPath(), fileName), os.O_RDWR|os.O_CREATE, filePermission)
+		if err != nil {
+			return nil, fmt.Errorf("secrets store csi driver failed to mount %s at %s: %w", fileName, req.GetTargetPath(), err)
+		}
+		defer file.Close()
+
+		_, err = io.Copy(file, content)
+		if err != nil {
+			return nil, fmt.Errorf("secrets store csi driver failed to mount %s at %s: %w", fileName, req.GetTargetPath(), err)
+		}
+		log.Infof("secrets store csi driver mounted %s", fileName)
+		log.Infof("mount point: %s", req.GetTargetPath())
 	}
-	log.Infof("secrets store csi driver mounted %s", fileName)
-	log.Infof("mount point: %s", req.GetTargetPath())
+
+	for idx, item := range attrib.Raw {
+		err = func() error {
+			content, err := m.springCloudConfigClient.GetConfigRaw(attrib, idx)
+			if err != nil {
+				return fmt.Errorf("failed to retrieve raw secrets for %s with path %s: %w", attrib.Application, item.Target, err)
+			}
+			defer content.Close()
+
+			file, err := os.OpenFile(path.Join(req.GetTargetPath(), item.Target), os.O_RDWR|os.O_CREATE, filePermission)
+			if err != nil {
+				return fmt.Errorf("secrets store csi driver failed to mount raw file %s for %s at %s: %w", item.Source, attrib.Application, item.Target, err)
+			}
+			defer file.Close()
+			_, err = io.Copy(file, content)
+			if err != nil {
+				return fmt.Errorf("secrets store csi driver failed to mount raw file %s for %s at %s: %w", item.Source, attrib.Application, item.Target, err)
+			}
+			log.Infof("secrets store csi driver mounted raw file %s for %s at %s", item.Source, attrib.Application, item.Target)
+			return nil
+		}()
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	// Files should not exceed 1MiB
 	return out, nil

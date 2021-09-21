@@ -7,10 +7,15 @@ import (
 	"time"
 )
 
-const springGetConfigPath = "/config/"
+const (
+	springGetConfigPath    = "/config/"
+	springRawGetConfigPath = "/springconfig/"
+	defaultConfigBranch    = "master"
+)
 
 type ConfigClient interface {
 	GetConfig(attributes Attributes) (io.ReadCloser, error)
+	GetConfigRaw(attributes Attributes, idx int) (io.ReadCloser, error)
 }
 
 type SpringCloudConfigClient struct {
@@ -25,6 +30,8 @@ func NewSpringCloudConfigClient() SpringCloudConfigClient {
 	}
 }
 
+// GetConfig pulls the config from spring-cloud config server and the server parses it to the specified format
+// if the config contains secrets they are decoded on the server side
 func (c *SpringCloudConfigClient) GetConfig(attributes Attributes) (io.ReadCloser, error) {
 	fullAddress := attributes.ServerAddress + springGetConfigPath + attributes.Application + "/" + attributes.Profile + "." + attributes.FileType
 	r, err := c.client.Get(fullAddress)
@@ -35,4 +42,18 @@ func (c *SpringCloudConfigClient) GetConfig(attributes Attributes) (io.ReadClose
 		return nil, fmt.Errorf("received %v instead of 200 while calling %s", r.StatusCode, fullAddress)
 	}
 	return r.Body, nil
+}
+
+// GetConfigRaw pulls the config from spring-cloud-config without parsing or decrypting the secrets
+func (c *SpringCloudConfigClient) GetConfigRaw(attributes Attributes, idx int) (io.ReadCloser, error) {
+	fullAddress := attributes.ServerAddress + springRawGetConfigPath + attributes.Application + "/" + attributes.Profile + "/" + defaultConfigBranch + "/" + attributes.Raw[idx].Source
+	r, err := c.client.Get(fullAddress)
+	if err != nil {
+		return nil, err
+	}
+	if r.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("received %v instead of 200 while calling %s", r.StatusCode, fullAddress)
+	}
+	return r.Body, nil
+
 }

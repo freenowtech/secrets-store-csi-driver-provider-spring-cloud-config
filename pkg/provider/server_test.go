@@ -28,6 +28,13 @@ func (c *configClientMock) GetConfig(_ Attributes) (io.ReadCloser, error) {
 	return ioutil.NopCloser(strings.NewReader(c.configResult)), nil
 }
 
+func (c *configClientMock) GetConfigRaw(_ Attributes, _ int) (io.ReadCloser, error) {
+	if c.err != nil {
+		return nil, c.err
+	}
+	return ioutil.NopCloser(strings.NewReader(c.configResult)), nil
+}
+
 func newConfigClientMock(expected string, err error) configClientMock {
 	return configClientMock{
 		configResult: expected,
@@ -40,6 +47,7 @@ func TestMountSecretsStoreObjectContent(t *testing.T) {
 		name          string
 		attrib        Attributes
 		expected      string
+		expectedRaw   []string
 		expectedError error
 		clientError   error
 	}{
@@ -72,6 +80,19 @@ func TestMountSecretsStoreObjectContent(t *testing.T) {
 			},
 			expectedError: errors.New("failed to retrieve secrets for some-testing.json: some error"),
 			clientError:   errors.New("some error"),
+		},
+		{
+			name: "When an item in Raw is missing a field then an error is returned",
+			attrib: Attributes{
+				ServerAddress: "http://example.com/",
+				Profile:       "testing",
+				Application:   "some",
+				FileType:      "json",
+				Raw: []Raw{
+					{Source: "some-source"},
+				},
+			},
+			expectedError: errors.New("Source or Target not set"),
 		},
 	}
 
@@ -110,8 +131,16 @@ func TestMountSecretsStoreObjectContent(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-
 			assert.Equal(t, tc.expected, string(actual), tc.name)
+
+			for idx, item := range tc.expectedRaw {
+				file, err := ioutil.ReadFile(tc.attrib.Raw[idx].Target)
+				if err != nil {
+					t.Fatal(err)
+				}
+				assert.Equal(t, item, string(file), tc.name)
+			}
+
 		}
 	}
 
