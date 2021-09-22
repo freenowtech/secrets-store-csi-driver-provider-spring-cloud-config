@@ -28,7 +28,7 @@ func (c *configClientMock) GetConfig(_ Attributes) (io.ReadCloser, error) {
 	return ioutil.NopCloser(strings.NewReader(c.configResult)), nil
 }
 
-func (c *configClientMock) GetConfigRaw(_ Attributes, _ int) (io.ReadCloser, error) {
+func (c *configClientMock) GetConfigRaw(_ Attributes, _ string) (io.ReadCloser, error) {
 	if c.err != nil {
 		return nil, c.err
 	}
@@ -81,19 +81,6 @@ func TestMountSecretsStoreObjectContent(t *testing.T) {
 			expectedError: errors.New("failed to retrieve secrets for some-testing.json: some error"),
 			clientError:   errors.New("some error"),
 		},
-		{
-			name: "When an item in Raw is missing a field then an error is returned",
-			attrib: Attributes{
-				ServerAddress: "http://example.com/",
-				Profile:       "testing",
-				Application:   "some",
-				FileType:      "json",
-				Raw: []Raw{
-					{Source: "some-source"},
-				},
-			},
-			expectedError: errors.New("Source or Target not set"),
-		},
 	}
 
 	for _, tc := range testcases {
@@ -103,6 +90,10 @@ func TestMountSecretsStoreObjectContent(t *testing.T) {
 		}
 		file := path.Join(dir, "some-testing.json")
 		sccMock := newConfigClientMock(tc.expected, tc.clientError)
+		// forcing test raw targets to create the files in the temp dir
+		for idx, item := range tc.attrib.Raw {
+			tc.attrib.Raw[idx].Target = path.Join(dir, item.Target)
+		}
 
 		provider, _ := NewSpringCloudConfigCSIProviderServer(filepath.Join(dir, "scc.sock"))
 		provider.springCloudConfigClient = &sccMock

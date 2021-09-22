@@ -39,9 +39,9 @@ type Raw struct {
 
 func (a *Attributes) verify() error {
 
-	for _, item := range a.Raw {
+	for idx, item := range a.Raw {
 		if item.Source == "" || item.Target == "" {
-			return fmt.Errorf("Source or Target not set")
+			return fmt.Errorf("source or target not set for raw file on index %d", idx)
 		}
 	}
 
@@ -138,47 +138,14 @@ func (m *SpringCloudConfigCSIProviderServer) Mount(ctx context.Context, req *v1a
 	}
 
 	if attrib.FileType != "" {
-		fileName := fmt.Sprintf("%s-%s.%s", attrib.Application, attrib.Profile, attrib.FileType)
-		content, err := m.springCloudConfigClient.GetConfig(attrib)
+		err = m.mountFile(attrib, req.GetTargetPath(), filePermission)
 		if err != nil {
-			return nil, fmt.Errorf("failed to retrieve secrets for %s: %w", fileName, err)
+			return nil, err
 		}
-		defer content.Close()
-
-		file, err := os.OpenFile(path.Join(req.GetTargetPath(), fileName), os.O_RDWR|os.O_CREATE, filePermission)
-		if err != nil {
-			return nil, fmt.Errorf("secrets store csi driver failed to mount %s at %s: %w", fileName, req.GetTargetPath(), err)
-		}
-		defer file.Close()
-
-		_, err = io.Copy(file, content)
-		if err != nil {
-			return nil, fmt.Errorf("secrets store csi driver failed to mount %s at %s: %w", fileName, req.GetTargetPath(), err)
-		}
-		log.Infof("secrets store csi driver mounted %s", fileName)
-		log.Infof("mount point: %s", req.GetTargetPath())
 	}
 
-	for idx, item := range attrib.Raw {
-		err = func() error {
-			content, err := m.springCloudConfigClient.GetConfigRaw(attrib, idx)
-			if err != nil {
-				return fmt.Errorf("failed to retrieve raw secrets for %s with path %s: %w", attrib.Application, item.Target, err)
-			}
-			defer content.Close()
-
-			file, err := os.OpenFile(path.Join(req.GetTargetPath(), item.Target), os.O_RDWR|os.O_CREATE, filePermission)
-			if err != nil {
-				return fmt.Errorf("secrets store csi driver failed to mount raw file %s for %s at %s: %w", item.Source, attrib.Application, item.Target, err)
-			}
-			defer file.Close()
-			_, err = io.Copy(file, content)
-			if err != nil {
-				return fmt.Errorf("secrets store csi driver failed to mount raw file %s for %s at %s: %w", item.Source, attrib.Application, item.Target, err)
-			}
-			log.Infof("secrets store csi driver mounted raw file %s for %s at %s", item.Source, attrib.Application, item.Target)
-			return nil
-		}()
+	for _, item := range attrib.Raw {
+		err = m.mountRawFile(attrib, item, filePermission)
 		if err != nil {
 			return nil, err
 		}
@@ -195,4 +162,46 @@ func (m *SpringCloudConfigCSIProviderServer) Version(ctx context.Context, req *v
 		RuntimeName:    "springcloudconfigprovider",
 		RuntimeVersion: "0.1.0",
 	}, nil
+}
+func (m *SpringCloudConfigCSIProviderServer) mountFile(attrib Attributes, targetPath string, filePermission os.FileMode) error {
+	fileName := fmt.Sprintf("%s-%s.%s", attrib.Application, attrib.Profile, attrib.FileType)
+	content, err := m.springCloudConfigClient.GetConfig(attrib)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve secrets for %s: %w", fileName, err)
+	}
+	defer content.Close()
+
+	file, err := os.OpenFile(path.Join(targetPath, fileName), os.O_RDWR|os.O_CREATE, filePermission)
+	if err != nil {
+		return fmt.Errorf("secrets store csi driver failed to mount %s at %s: %w", fileName, targetPath, err)
+	}
+	defer file.Close()
+
+	_, err = io.Copy(file, content)
+	if err != nil {
+		return fmt.Errorf("secrets store csi driver failed to mount %s at %s: %w", fileName, targetPath, err)
+	}
+	log.Infof("secrets store csi driver mounted %s", fileName)
+	log.Infof("mount point: %s", targetPath)
+	return nil
+}
+
+func (m *SpringCloudConfigCSIProviderServer) mountRawFile(attrib Attributes, item Raw, filePermission os.FileMode) error {
+	content, err := m.springCloudConfigClient.GetConfigRaw(attrib, item.Target)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve raw secrets for %s with path %s: %w", attrib.Application, item.Target, err)
+	}
+	defer content.Close()
+
+	file, err := os.OpenFile(item.Target, os.O_RDWR|os.O_CREATE, filePermission)
+	if err != nil {
+		return fmt.Errorf("secrets store csi driver failed to mount raw file %s for %s at %s: %w", item.Source, attrib.Application, item.Target, err)
+	}
+	defer file.Close()
+	_, err = io.Copy(file, content)
+	if err != nil {
+		return fmt.Errorf("secrets store csi driver failed to mount raw file %s for %s at %s: %w", item.Source, attrib.Application, item.Target, err)
+	}
+	log.Infof("secrets store csi driver mounted raw file %s for %s at %s", item.Source, attrib.Application, item.Target)
+	return nil
 }

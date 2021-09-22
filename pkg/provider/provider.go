@@ -15,7 +15,7 @@ const (
 
 type ConfigClient interface {
 	GetConfig(attributes Attributes) (io.ReadCloser, error)
-	GetConfigRaw(attributes Attributes, idx int) (io.ReadCloser, error)
+	GetConfigRaw(attributes Attributes, source string) (io.ReadCloser, error)
 }
 
 type SpringCloudConfigClient struct {
@@ -45,8 +45,8 @@ func (c *SpringCloudConfigClient) GetConfig(attributes Attributes) (io.ReadClose
 }
 
 // GetConfigRaw pulls the config from spring-cloud-config without parsing or decrypting the secrets
-func (c *SpringCloudConfigClient) GetConfigRaw(attributes Attributes, idx int) (io.ReadCloser, error) {
-	fullAddress := attributes.ServerAddress + springRawGetConfigPath + attributes.Application + "/" + attributes.Profile + "/" + defaultConfigBranch + "/" + attributes.Raw[idx].Source
+func (c *SpringCloudConfigClient) GetConfigRaw(attributes Attributes, source string) (io.ReadCloser, error) {
+	fullAddress := attributes.ServerAddress + springRawGetConfigPath + attributes.Application + "/" + attributes.Profile + "/" + defaultConfigBranch + "/" + source
 	r, err := c.client.Get(fullAddress)
 	if err != nil {
 		return nil, err
