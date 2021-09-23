@@ -28,6 +28,13 @@ func (c *configClientMock) GetConfig(_ Attributes) (io.ReadCloser, error) {
 	return ioutil.NopCloser(strings.NewReader(c.configResult)), nil
 }
 
+func (c *configClientMock) GetConfigRaw(_ Attributes, _ string) (io.ReadCloser, error) {
+	if c.err != nil {
+		return nil, c.err
+	}
+	return ioutil.NopCloser(strings.NewReader(c.configResult)), nil
+}
+
 func newConfigClientMock(expected string, err error) configClientMock {
 	return configClientMock{
 		configResult: expected,
@@ -40,6 +47,7 @@ func TestMountSecretsStoreObjectContent(t *testing.T) {
 		name          string
 		attrib        Attributes
 		expected      string
+		expectedRaw   []string
 		expectedError error
 		clientError   error
 	}{
@@ -82,6 +90,10 @@ func TestMountSecretsStoreObjectContent(t *testing.T) {
 		}
 		file := path.Join(dir, "some-testing.json")
 		sccMock := newConfigClientMock(tc.expected, tc.clientError)
+		// forcing test raw targets to create the files in the temp dir
+		for idx, item := range tc.attrib.Raw {
+			tc.attrib.Raw[idx].Target = path.Join(dir, item.Target)
+		}
 
 		provider, _ := NewSpringCloudConfigCSIProviderServer(filepath.Join(dir, "scc.sock"))
 		provider.springCloudConfigClient = &sccMock
@@ -110,8 +122,16 @@ func TestMountSecretsStoreObjectContent(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-
 			assert.Equal(t, tc.expected, string(actual), tc.name)
+
+			for idx, item := range tc.expectedRaw {
+				file, err := ioutil.ReadFile(tc.attrib.Raw[idx].Target)
+				if err != nil {
+					t.Fatal(err)
+				}
+				assert.Equal(t, item, string(file), tc.name)
+			}
+
 		}
 	}
 
