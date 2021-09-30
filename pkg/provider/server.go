@@ -29,7 +29,7 @@ type Attributes struct {
 	Application   string `json:"application,omitempty"`
 	Profile       string `json:"profile,omitempty"`
 	FileType      string `json:"fileType,omitempty"`
-	Raw           []Raw  `json:"raw"`
+	Raw           string `json:"raw"`
 }
 
 type Raw struct {
@@ -37,11 +37,22 @@ type Raw struct {
 	Target string `json:"target,omitempty"`
 }
 
-func (a *Attributes) verify() error {
+func (a *Attributes) getRaw() (raw []Raw, err error) {
+	err = json.Unmarshal([]byte(a.Raw), &raw)
+	return
+}
 
-	for idx, item := range a.Raw {
-		if item.Source == "" || item.Target == "" {
-			return fmt.Errorf("source or target not set for raw file on index %d", idx)
+func (a *Attributes) verify() (err error) {
+	var raw []Raw
+	if a.Raw != "" {
+		raw, err = a.getRaw()
+		if err != nil {
+			return err
+		}
+		for idx, item := range raw {
+			if item.Source == "" || item.Target == "" {
+				return fmt.Errorf("source or target not set for raw file on index %d", idx)
+			}
 		}
 	}
 
@@ -58,8 +69,8 @@ func (a *Attributes) verify() error {
 	}
 
 	// TODO might want to warn/info in-case only raw files were created
-	if a.FileType == "" && len(a.Raw) == 0 {
-		return fmt.Errorf("FileType is not set")
+	if a.FileType == "" && len(raw) == 0 {
+		return fmt.Errorf("FileType and raw are not set, atleast one is required")
 	}
 
 	return nil
@@ -144,7 +155,11 @@ func (m *SpringCloudConfigCSIProviderServer) Mount(ctx context.Context, req *v1a
 		}
 	}
 
-	for _, item := range attrib.Raw {
+	raw, err := attrib.getRaw()
+	if err != nil {
+		return nil, err
+	}
+	for _, item := range raw {
 		err = m.mountRawFile(attrib, item, filePermission)
 		if err != nil {
 			return nil, err

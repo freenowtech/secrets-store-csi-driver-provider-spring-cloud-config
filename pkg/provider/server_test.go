@@ -68,7 +68,7 @@ func TestMountSecretsStoreObjectContent(t *testing.T) {
 				Profile:       "testing",
 				Application:   "some",
 			},
-			expectedError: errors.New("FileType is not set"),
+			expectedError: errors.New("FileType and raw are not set, atleast one is required"),
 		},
 		{
 			name: "When the ServerAddress is wrong then an error is returned",
@@ -91,9 +91,21 @@ func TestMountSecretsStoreObjectContent(t *testing.T) {
 		file := path.Join(dir, "some-testing.json")
 		sccMock := newConfigClientMock(tc.expected, tc.clientError)
 		// forcing test raw targets to create the files in the temp dir
-		for idx, item := range tc.attrib.Raw {
-			tc.attrib.Raw[idx].Target = path.Join(dir, item.Target)
+		var raw []Raw
+		if tc.attrib.Raw != "" {
+			raw, err = tc.attrib.getRaw()
+			if err != nil {
+				t.Fatal(err)
+			}
 		}
+		for idx, item := range raw {
+			raw[idx].Target = path.Join(dir, item.Target)
+		}
+		rawBytes, err := json.Marshal(raw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		tc.attrib.Raw = string(rawBytes)
 
 		provider, _ := NewSpringCloudConfigCSIProviderServer(filepath.Join(dir, "scc.sock"))
 		provider.springCloudConfigClient = &sccMock
@@ -125,7 +137,7 @@ func TestMountSecretsStoreObjectContent(t *testing.T) {
 			assert.Equal(t, tc.expected, string(actual), tc.name)
 
 			for idx, item := range tc.expectedRaw {
-				file, err := ioutil.ReadFile(tc.attrib.Raw[idx].Target)
+				file, err := ioutil.ReadFile(raw[idx].Target)
 				if err != nil {
 					t.Fatal(err)
 				}
