@@ -202,9 +202,9 @@ func (m *SpringCloudConfigCSIProviderServer) mountFile(attrib Attributes, target
 }
 
 func (m *SpringCloudConfigCSIProviderServer) mountRawFile(attrib Attributes, item Raw, filePermission os.FileMode) error {
-	content, err := m.springCloudConfigClient.GetConfigRaw(attrib, item.Target)
+	content, err := m.springCloudConfigClient.GetConfigRaw(attrib, item.Source)
 	if err != nil {
-		return fmt.Errorf("failed to retrieve raw secrets for %s with path %s: %w", attrib.Application, item.Target, err)
+		return fmt.Errorf("failed to retrieve raw secrets for %s with path %s: %w", attrib.Application, item.Source, err)
 	}
 	defer content.Close()
 
