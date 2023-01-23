@@ -33,6 +33,5 @@ release: test package
 .PHONY: release_latest
 release_latest: release
 ifeq (${BUILD_BRANCH},master)
-	docker tag ${CONTAINER_IMAGE} ${REGISTRY}/${PROJECT_NAME}:latest
-	docker push ${REGISTRY}/${PROJECT_NAME}:latest
+	docker buildx build --push --platform linux/amd64,linux/arm64 -t ${CONTAINER_IMAGE} ${REGISTRY}/${PROJECT_NAME}:latest
 endif
