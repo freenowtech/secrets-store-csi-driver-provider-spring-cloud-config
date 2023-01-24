@@ -15,5 +15,12 @@ jobs:
     - uses: actions/checkout@v1
     - name: Login to Docker Hub
       run: docker login --username platformbuild --password ${{ secrets.DOCKER_HUB_PASS }}
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v2
+    - name: Set up Docker Buildx
+      id: buildx
+      uses: docker/setup-buildx-action@v2
+      with:
+        config: .github/buildkit.toml
     - name: Build and Push the Docker image
       run: env BUILD_BRANCH=${GITHUB_REF##*/} make release_latest

@@ -20,19 +20,18 @@ build: setup
 
 .PHONY: package
 package:
-	docker build --rm --pull -t ${CONTAINER_IMAGE} .
+	docker buildx build --platform linux/amd64,linux/arm64 -t ${CONTAINER_IMAGE} .
 
 .PHONY: test
 test:
 	docker run --rm -e CGO_ENABLED=0 -v "$(PWD):/go/src/github.com/freenowtech/$(PROJECT_NAME)" -w "/go/src/github.com/freenowtech/$(PROJECT_NAME)" golang:1.13.4-alpine  go test ./...
 
 .PHONY: release
-release: test package
-	docker push ${CONTAINER_IMAGE}
+release: test
+	docker buildx build --push --platform linux/amd64,linux/arm64 -t ${CONTAINER_IMAGE} .
 
 .PHONY: release_latest
-release_latest: release
+release_latest: test
 ifeq (${BUILD_BRANCH},master)
-	docker tag ${CONTAINER_IMAGE} ${REGISTRY}/${PROJECT_NAME}:latest
-	docker push ${REGISTRY}/${PROJECT_NAME}:latest
+	docker buildx build --push --platform linux/amd64,linux/arm64 -t ${REGISTRY}/${PROJECT_NAME}:latest .
 endif
