@@ -33,5 +33,5 @@ release: test
 .PHONY: release_latest
 release_latest: test
 ifeq (${BUILD_BRANCH},master)
-	docker buildx build --push --platform linux/amd64,linux/arm64 -t ${REGISTRY}/${PROJECT_NAME}:latest .
+	docker buildx build --push --platform linux/amd64,linux/arm64 -t ${REGISTRY}/${PROJECT_NAME}:latest -t ${CONTAINER_IMAGE} .
 endif
