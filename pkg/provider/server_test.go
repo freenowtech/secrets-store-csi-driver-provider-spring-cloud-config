@@ -6,14 +6,14 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
+	"os"
 	"path"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"sigs.k8s.io/secrets-store-csi-driver/provider/v1alpha1"
-
 	"github.com/stretchr/testify/assert"
+	"sigs.k8s.io/secrets-store-csi-driver/provider/v1alpha1"
 )
 
 type configClientMock struct {
@@ -25,14 +25,14 @@ func (c *configClientMock) GetConfig(_ Attributes) (io.ReadCloser, error) {
 	if c.err != nil {
 		return nil, c.err
 	}
-	return ioutil.NopCloser(strings.NewReader(c.configResult)), nil
+	return io.NopCloser(strings.NewReader(c.configResult)), nil
 }
 
 func (c *configClientMock) GetConfigRaw(_ Attributes, _ string) (io.ReadCloser, error) {
 	if c.err != nil {
 		return nil, c.err
 	}
-	return ioutil.NopCloser(strings.NewReader(c.configResult)), nil
+	return io.NopCloser(strings.NewReader(c.configResult)), nil
 }
 
 func newConfigClientMock(expected string, err error) configClientMock {
@@ -84,67 +84,68 @@ func TestMountSecretsStoreObjectContent(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		dir, err := ioutil.TempDir("", "scc-secrets-store-unittest")
-		if err != nil {
-			t.Fatal(err)
-		}
-		file := path.Join(dir, "some-testing.json")
-		sccMock := newConfigClientMock(tc.expected, tc.clientError)
-		// forcing test raw targets to create the files in the temp dir
-		var raw []Raw
-		if tc.attrib.Raw != "" {
-			raw, err = tc.attrib.getRaw()
+		t.Run(tc.name, func(t *testing.T) {
+			dir, err := os.MkdirTemp("", "scc-secrets-store-unittest")
 			if err != nil {
 				t.Fatal(err)
 			}
-		}
-		for idx, item := range raw {
-			raw[idx].Target = path.Join(dir, item.Target)
-		}
-		rawBytes, err := json.Marshal(raw)
-		if err != nil {
-			t.Fatal(err)
-		}
-		tc.attrib.Raw = string(rawBytes)
-
-		provider, _ := NewSpringCloudConfigCSIProviderServer(filepath.Join(dir, "scc.sock"))
-		provider.springCloudConfigClient = &sccMock
-
-		attributes, err := json.Marshal(tc.attrib)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		resp, err := provider.Mount(context.TODO(), &v1alpha1.MountRequest{
-			Attributes: string(attributes),
-			Secrets:    "{\"some\":\"json\"}",
-			TargetPath: dir,
-			Permission: "777",
-		})
-
-		if resp != nil && resp.Error != nil && resp.Error.String() != "" {
-			t.Fatal(resp.Error.String())
-		}
-
-		if tc.expectedError != nil {
-			assert.EqualError(t, err, tc.expectedError.Error(), tc.name)
-		} else {
-			assert.NoError(t, err, tc.name)
-			actual, err := ioutil.ReadFile(file)
-			if err != nil {
-				t.Fatal(err)
-			}
-			assert.Equal(t, tc.expected, string(actual), tc.name)
-
-			for idx, item := range tc.expectedRaw {
-				file, err := ioutil.ReadFile(raw[idx].Target)
+			file := path.Join(dir, "some-testing.json")
+			sccMock := newConfigClientMock(tc.expected, tc.clientError)
+			// forcing test raw targets to create the files in the temp dir
+			var raw []Raw
+			if tc.attrib.Raw != "" {
+				raw, err = tc.attrib.getRaw()
 				if err != nil {
 					t.Fatal(err)
 				}
-				assert.Equal(t, item, string(file), tc.name)
+			}
+			for idx, item := range raw {
+				raw[idx].Target = path.Join(dir, item.Target)
+			}
+			rawBytes, err := json.Marshal(raw)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tc.attrib.Raw = string(rawBytes)
+
+			provider, _ := NewSpringCloudConfigCSIProviderServer(filepath.Join(dir, "scc.sock"))
+			provider.springCloudConfigClient = &sccMock
+
+			attributes, err := json.Marshal(tc.attrib)
+			if err != nil {
+				t.Fatal(err)
 			}
 
-		}
+			resp, err := provider.Mount(context.TODO(), &v1alpha1.MountRequest{
+				Attributes: string(attributes),
+				Secrets:    "{\"some\":\"json\"}",
+				TargetPath: dir,
+				Permission: "777",
+			})
+
+			if resp != nil && resp.Error != nil && resp.Error.String() != "" {
+				t.Fatal(resp.Error.String())
+			}
+
+			if tc.expectedError != nil {
+				assert.EqualError(t, err, tc.expectedError.Error(), tc.name)
+			} else {
+				assert.NoError(t, err, tc.name)
+				actual, err := ioutil.ReadFile(file)
+				if err != nil {
+					t.Fatal(err)
+				}
+				assert.Equal(t, tc.expected, string(actual), tc.name)
+
+				for idx, item := range tc.expectedRaw {
+					file, err := ioutil.ReadFile(raw[idx].Target)
+					if err != nil {
+						t.Fatal(err)
+					}
+					assert.Equal(t, item, string(file), tc.name)
+				}
+			}
+		})
 	}
 
 }
