@@ -4,147 +4,157 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
-	"io/ioutil"
+	"net/http"
+	"os"
 	"path"
 	"path/filepath"
-	"strings"
 	"testing"
 
-	"sigs.k8s.io/secrets-store-csi-driver/provider/v1alpha1"
-
+	"github.com/h2non/gock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"sigs.k8s.io/secrets-store-csi-driver/provider/v1alpha1"
 )
 
-type configClientMock struct {
-	configResult string
-	err          error
-}
-
-func (c *configClientMock) GetConfig(_ Attributes) (io.ReadCloser, error) {
-	if c.err != nil {
-		return nil, c.err
+func TestSpringCloudConfigCSIProviderServer_Mount(t *testing.T) {
+	type configServerRequest struct {
+		path            string
+		statusCode      int
+		responsePayload string
 	}
-	return ioutil.NopCloser(strings.NewReader(c.configResult)), nil
-}
 
-func (c *configClientMock) GetConfigRaw(_ Attributes, _ string) (io.ReadCloser, error) {
-	if c.err != nil {
-		return nil, c.err
-	}
-	return ioutil.NopCloser(strings.NewReader(c.configResult)), nil
-}
-
-func newConfigClientMock(expected string, err error) configClientMock {
-	return configClientMock{
-		configResult: expected,
-		err:          err,
-	}
-}
-
-func TestMountSecretsStoreObjectContent(t *testing.T) {
 	testcases := []struct {
-		name          string
-		attrib        Attributes
-		expected      string
-		expectedRaw   []string
-		expectedError error
-		clientError   error
+		name                 string
+		configServerRequests []*configServerRequest
+		attrib               Attributes
+		wantFiles            map[string]string
+		expected             string
+		wantRawContent       map[string]string
+		wantError            error
 	}{
 		{
-			name: "When all attributes are passed and correct then it creates the secret file",
+			name: "When all attributes are passed and correctly then it creates the secret file",
+			configServerRequests: []*configServerRequest{
+				{
+					path:            "/config/some/testing.json",
+					statusCode:      200,
+					responsePayload: `{"some":"json"}`,
+				},
+			},
 			attrib: Attributes{
-				ServerAddress: "http://example.com/",
+				ServerAddress: "http://configserver.localhost",
 				Profile:       "testing",
 				Application:   "some",
 				FileType:      "json",
 			},
-			expected: "{\"some\":\"json\"}",
+			wantFiles: map[string]string{"some-testing.json": `{"some":"json"}`},
+		},
+		{
+			name: "When raw files are part of the attributes then it creates the raw files",
+			configServerRequests: []*configServerRequest{
+				{
+					path:            "/springconfig/some/testing/master/abc.conf",
+					statusCode:      200,
+					responsePayload: "content abc.def",
+				},
+			},
+			attrib: Attributes{
+				ServerAddress: "http://configserver.localhost",
+				Profile:       "testing",
+				Application:   "some",
+				Raw:           `[{"source":"abc.conf","target":"def.conf"}]`,
+			},
+			wantFiles: map[string]string{"def.conf": "content abc.def"},
 		},
 		{
 			name: "When an attribute is not set then an error is returned",
 			attrib: Attributes{
-				ServerAddress: "http://example.com/",
+				ServerAddress: "http://configserver.localhost",
 				Profile:       "testing",
 				Application:   "some",
 			},
-			expectedError: errors.New("FileType and raw are not set, atleast one is required"),
+			wantError: errors.New("FileType and raw are not set, atleast one is required"),
 		},
 		{
-			name: "When the ServerAddress is wrong then an error is returned",
+			name: "When ConfigServer returns an error then it errors",
+			configServerRequests: []*configServerRequest{
+				{path: "/config/some/testing.json",
+					statusCode:      500,
+					responsePayload: "an error occurred",
+				},
+			},
 			attrib: Attributes{
-				ServerAddress: "example.com/",
+				ServerAddress: "http://configserver.localhost",
 				Profile:       "testing",
 				Application:   "some",
 				FileType:      "json",
 			},
-			expectedError: errors.New("failed to retrieve secrets for some-testing.json: some error"),
-			clientError:   errors.New("some error"),
+			wantError: errors.New("failed to retrieve secrets for some-testing.json: received 500 instead of 200 while calling http://configserver.localhost/config/some/testing.json"),
 		},
 	}
 
 	for _, tc := range testcases {
-		dir, err := ioutil.TempDir("", "scc-secrets-store-unittest")
-		if err != nil {
-			t.Fatal(err)
-		}
-		file := path.Join(dir, "some-testing.json")
-		sccMock := newConfigClientMock(tc.expected, tc.clientError)
-		// forcing test raw targets to create the files in the temp dir
-		var raw []Raw
-		if tc.attrib.Raw != "" {
-			raw, err = tc.attrib.getRaw()
+		t.Run(tc.name, func(t *testing.T) {
+			defer gock.Off()
+			//gock.Observe(gock.DumpRequest)
+			for _, mockRequest := range tc.configServerRequests {
+				gock.New(tc.attrib.ServerAddress).
+					Get(mockRequest.path).
+					Reply(mockRequest.statusCode).
+					BodyString(mockRequest.responsePayload)
+			}
+
+			dir, err := os.MkdirTemp("", "scc-secrets-store-unittest")
 			if err != nil {
 				t.Fatal(err)
 			}
-		}
-		for idx, item := range raw {
-			raw[idx].Target = path.Join(dir, item.Target)
-		}
-		rawBytes, err := json.Marshal(raw)
-		if err != nil {
-			t.Fatal(err)
-		}
-		tc.attrib.Raw = string(rawBytes)
 
-		provider, _ := NewSpringCloudConfigCSIProviderServer(filepath.Join(dir, "scc.sock"))
-		provider.springCloudConfigClient = &sccMock
+			httpClient := createHttpClient()
+			provider, _ := NewSpringCloudConfigCSIProviderServer(filepath.Join(dir, "scc.sock"), httpClient)
 
-		attributes, err := json.Marshal(tc.attrib)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		resp, err := provider.Mount(context.TODO(), &v1alpha1.MountRequest{
-			Attributes: string(attributes),
-			Secrets:    "{\"some\":\"json\"}",
-			TargetPath: dir,
-			Permission: "777",
-		})
-
-		if resp != nil && resp.Error != nil && resp.Error.String() != "" {
-			t.Fatal(resp.Error.String())
-		}
-
-		if tc.expectedError != nil {
-			assert.EqualError(t, err, tc.expectedError.Error(), tc.name)
-		} else {
-			assert.NoError(t, err, tc.name)
-			actual, err := ioutil.ReadFile(file)
+			attributes, err := json.Marshal(tc.attrib)
 			if err != nil {
 				t.Fatal(err)
 			}
-			assert.Equal(t, tc.expected, string(actual), tc.name)
 
-			for idx, item := range tc.expectedRaw {
-				file, err := ioutil.ReadFile(raw[idx].Target)
-				if err != nil {
-					t.Fatal(err)
+			resp, err := provider.Mount(context.TODO(), &v1alpha1.MountRequest{
+				Attributes: string(attributes),
+				Secrets:    "{\"some\":\"json\"}",
+				TargetPath: dir,
+				Permission: "777",
+			})
+
+			if resp != nil && resp.Error != nil && resp.Error.String() != "" {
+				t.Fatal(resp.Error.String())
+			}
+
+			if tc.wantError != nil {
+				assert.EqualError(t, err, tc.wantError.Error(), tc.name)
+			} else {
+				assert.NoError(t, err)
+				entries, err := os.ReadDir(dir)
+				require.NoError(t, err)
+				actualFiles := map[string]string{}
+				for _, entry := range entries {
+					if entry.IsDir() {
+						continue
+					}
+
+					content, err := os.ReadFile(path.Join(dir, entry.Name()))
+					require.NoError(t, err)
+					actualFiles[entry.Name()] = string(content)
 				}
-				assert.Equal(t, item, string(file), tc.name)
+
+				assert.Equal(t, tc.wantFiles, actualFiles)
 			}
 
-		}
+			require.True(t, gock.IsDone())
+		})
 	}
+}
 
+func createHttpClient() *http.Client {
+	c := &http.Client{}
+	gock.InterceptClient(c)
+	return c
 }

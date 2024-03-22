@@ -19,14 +19,18 @@ type ConfigClient interface {
 }
 
 type SpringCloudConfigClient struct {
-	client http.Client
+	client *http.Client
 }
 
-func NewSpringCloudConfigClient() SpringCloudConfigClient {
-	return SpringCloudConfigClient{
-		client: http.Client{
+func NewSpringCloudConfigClient(c *http.Client) SpringCloudConfigClient {
+	if c == nil {
+		c = &http.Client{
 			Timeout: 5 * time.Second,
-		},
+		}
+	}
+
+	return SpringCloudConfigClient{
+		client: c,
 	}
 }
 

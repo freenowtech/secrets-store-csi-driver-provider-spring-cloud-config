@@ -16,7 +16,7 @@ func main() {
 	// Delete previous socket if exists
 	_ = os.Remove(socketPath)
 
-	server, err := provider.NewSpringCloudConfigCSIProviderServer(socketPath)
+	server, err := provider.NewSpringCloudConfigCSIProviderServer(socketPath, nil)
 	if err != nil {
 		log.Fatalf("error occured on server initialization: %v", err)
 	}
