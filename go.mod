@@ -3,6 +3,7 @@ module github.com/freenowtech/secrets-store-csi-driver-provider-spring-cloud-con
 go 1.22.1
 
 require (
+	github.com/h2non/gock v1.2.0
 	github.com/sirupsen/logrus v1.7.0
 	github.com/stretchr/testify v1.8.2
 	google.golang.org/grpc v1.56.3
@@ -12,6 +13,7 @@ require (
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
+	github.com/h2non/parth v0.0.0-20190131123155-b4df798d6542 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/sys v0.15.0 // indirect

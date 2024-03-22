@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"os"
 	"path"
 
@@ -38,7 +39,15 @@ type Raw struct {
 }
 
 func (a *Attributes) getRaw() (raw []Raw, err error) {
+	if a.Raw == "" {
+		return raw, nil
+	}
+
 	err = json.Unmarshal([]byte(a.Raw), &raw)
+	if err != nil {
+		return raw, fmt.Errorf("unmarshal attribute 'raw' from JSON: %w", err)
+	}
+
 	return
 }
 
@@ -77,8 +86,8 @@ func (a *Attributes) verify() (err error) {
 }
 
 // NewSpringCloudConfigCSIProviderServer returns CSI provider that uses the spring as the secret backend
-func NewSpringCloudConfigCSIProviderServer(socketPath string) (*SpringCloudConfigCSIProviderServer, error) {
-	client := NewSpringCloudConfigClient()
+func NewSpringCloudConfigCSIProviderServer(socketPath string, httpClient *http.Client) (*SpringCloudConfigCSIProviderServer, error) {
+	client := NewSpringCloudConfigClient(httpClient)
 	server := grpc.NewServer()
 	s := &SpringCloudConfigCSIProviderServer{
 		springCloudConfigClient: &client,
@@ -160,7 +169,7 @@ func (m *SpringCloudConfigCSIProviderServer) Mount(ctx context.Context, req *v1a
 		return nil, err
 	}
 	for _, item := range raw {
-		err = m.mountRawFile(attrib, item, filePermission)
+		err = m.mountRawFile(attrib, item, req.GetTargetPath(), filePermission)
 		if err != nil {
 			return nil, err
 		}
@@ -201,14 +210,14 @@ func (m *SpringCloudConfigCSIProviderServer) mountFile(attrib Attributes, target
 	return nil
 }
 
-func (m *SpringCloudConfigCSIProviderServer) mountRawFile(attrib Attributes, item Raw, filePermission os.FileMode) error {
+func (m *SpringCloudConfigCSIProviderServer) mountRawFile(attrib Attributes, item Raw, targetPath string, filePermission os.FileMode) error {
 	content, err := m.springCloudConfigClient.GetConfigRaw(attrib, item.Source)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve raw secrets for %s with path %s: %w", attrib.Application, item.Source, err)
 	}
 	defer content.Close()
 
-	file, err := os.OpenFile(item.Target, os.O_RDWR|os.O_CREATE, filePermission)
+	file, err := os.OpenFile(path.Join(targetPath, item.Target), os.O_RDWR|os.O_CREATE, filePermission)
 	if err != nil {
 		return fmt.Errorf("secrets store csi driver failed to mount raw file %s for %s at %s: %w", item.Source, attrib.Application, item.Target, err)
 	}
