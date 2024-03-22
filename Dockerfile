@@ -7,7 +7,7 @@ COPY . /go/src/github.com/freenowtech/secrets-store-csi-driver-provider-spring-c
 WORKDIR /go/src/github.com/freenowtech/secrets-store-csi-driver-provider-spring-cloud-config
 RUN make build
 
-FROM alpine:3.14.1
+FROM alpine:3.19.1
 COPY --from=builder /go/src/github.com/freenowtech/secrets-store-csi-driver-provider-spring-cloud-config/secrets-store-csi-driver-provider-spring-cloud-config /bin/
 RUN chmod a+x /bin/secrets-store-csi-driver-provider-spring-cloud-config
 
