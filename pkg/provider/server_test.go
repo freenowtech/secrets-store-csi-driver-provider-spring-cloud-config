@@ -9,6 +9,7 @@ import (
 	"path"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/h2non/gock"
 	"github.com/stretchr/testify/assert"
@@ -27,8 +28,8 @@ func TestSpringCloudConfigCSIProviderServer_Mount(t *testing.T) {
 		name                 string
 		configServerRequests []*configServerRequest
 		attrib               Attributes
+		retries              uint64
 		wantFiles            map[string]string
-		expected             string
 		wantRawContent       map[string]string
 		wantError            error
 	}{
@@ -78,7 +79,8 @@ func TestSpringCloudConfigCSIProviderServer_Mount(t *testing.T) {
 		{
 			name: "When ConfigServer returns an error then it errors",
 			configServerRequests: []*configServerRequest{
-				{path: "/config/some/testing.json",
+				{
+					path:            "/config/some/testing.json",
 					statusCode:      500,
 					responsePayload: "an error occurred",
 				},
@@ -90,6 +92,34 @@ func TestSpringCloudConfigCSIProviderServer_Mount(t *testing.T) {
 				FileType:      "json",
 			},
 			wantError: errors.New("failed to retrieve secrets for some-testing.json: received 500 instead of 200 while calling http://configserver.localhost/config/some/testing.json"),
+		},
+		{
+			name:    "When ConfigServer returns an error and retries are configured then it retries the request",
+			retries: 2,
+			configServerRequests: []*configServerRequest{
+				{
+					path:            "/config/some/testing.json",
+					statusCode:      500,
+					responsePayload: "an error occurred",
+				},
+				{
+					path:            "/config/some/testing.json",
+					statusCode:      500,
+					responsePayload: "an error occurred",
+				},
+				{
+					path:            "/config/some/testing.json",
+					statusCode:      200,
+					responsePayload: `{"some":"json"}`,
+				},
+			},
+			attrib: Attributes{
+				ServerAddress: "http://configserver.localhost",
+				Profile:       "testing",
+				Application:   "some",
+				FileType:      "json",
+			},
+			wantFiles: map[string]string{"some-testing.json": `{"some":"json"}`},
 		},
 	}
 
@@ -110,7 +140,7 @@ func TestSpringCloudConfigCSIProviderServer_Mount(t *testing.T) {
 			}
 
 			httpClient := createHttpClient()
-			provider, _ := NewSpringCloudConfigCSIProviderServer(filepath.Join(dir, "scc.sock"), httpClient)
+			provider, _ := NewSpringCloudConfigCSIProviderServer(filepath.Join(dir, "scc.sock"), httpClient, 1*time.Nanosecond, tc.retries)
 
 			attributes, err := json.Marshal(tc.attrib)
 			if err != nil {
