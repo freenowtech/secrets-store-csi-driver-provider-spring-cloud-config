@@ -14,7 +14,7 @@ The Spring Cloud Config provider for Secrets Store CSI driver allows you to get 
 To install the provider, use the YAML file in the deployment directory:
 
 ```shell
-kubectl apply -f https://raw.githubusercontent.com/freenowtech/secrets-store-csi-driver-provider-spring-cloud-config/main/deployment/provider.yaml
+kubectl apply -f https://raw.githubusercontent.com/freenowtech/secrets-store-csi-driver-provider-spring-cloud-config/master/deployment/provider.yaml
 ```
 
 ## Usage
