@@ -54,7 +54,6 @@ spec:
       containers:
         - name: provider
           image: ghcr.io/freenowtech/secrets-store-csi-driver-provider-spring-cloud-config:latest
-          imagePullPolicy: IfNotPresent
           resources:
             requests:
               cpu: 5m
