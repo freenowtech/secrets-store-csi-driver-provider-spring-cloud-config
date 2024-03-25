@@ -1,22 +1,23 @@
-secrets-store-csi-driver-provider-spring-cloud-config
-=====================================================
+# secrets-store-csi-driver-provider-spring-cloud-config
 
 The Spring Cloud Config provider for Secrets Store CSI driver allows you to get content stored in Spring Cloud Config and use the Secrets Store CSI driver interface to mount them into a Kubernetes pods.
 
-Usage
------
+## Installation
 
-### Install the Secrets Store CSI Driver
+### Requirements
 
----
+- A running instance of [Spring Cloud Config Server](https://docs.spring.io/spring-cloud-config/docs/current/reference/html/)
+- [Secrets Store CSI Driver installed](https://secrets-store-csi-driver.sigs.k8s.io/getting-started/installation.html)
 
-**NOTE**
+### Installing the provider
 
-To install the Secrets Store CSI driver you need Kubernetes 1.15.x with the CSIInlineVolume feature gate or a 1.16.x+ cluster.
+To install the provider, use the YAML file in the deployment directory:
 
----
+```shell
+kubectl apply -f https://raw.githubusercontent.com/freenowtech/secrets-store-csi-driver-provider-spring-cloud-config/main/deployment/provider.yaml
+```
 
-Make sure you have followed the Installation guide for the [Secrets Store CSI Driver](https://github.com/deislabs/secrets-store-csi-driver#usage).
+## Usage
 
 Create a `SecretProviderClass` resource to provide Spring-Cloud-Config-specific parameters for the Secrets Store CSI driver.
 
