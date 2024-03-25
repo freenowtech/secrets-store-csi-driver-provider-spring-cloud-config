@@ -4,6 +4,7 @@ go 1.22.1
 
 require (
 	github.com/h2non/gock v1.2.0
+	github.com/sethvargo/go-retry v0.2.4
 	github.com/sirupsen/logrus v1.7.0
 	github.com/stretchr/testify v1.8.2
 	google.golang.org/grpc v1.56.3

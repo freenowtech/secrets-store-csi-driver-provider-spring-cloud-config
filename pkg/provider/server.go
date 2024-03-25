@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -86,8 +87,8 @@ func (a *Attributes) verify() (err error) {
 }
 
 // NewSpringCloudConfigCSIProviderServer returns CSI provider that uses the spring as the secret backend
-func NewSpringCloudConfigCSIProviderServer(socketPath string, httpClient *http.Client) (*SpringCloudConfigCSIProviderServer, error) {
-	client := NewSpringCloudConfigClient(httpClient)
+func NewSpringCloudConfigCSIProviderServer(socketPath string, httpClient *http.Client, retryBaseWait time.Duration, retryMax uint64) (*SpringCloudConfigCSIProviderServer, error) {
+	client := NewSpringCloudConfigClient(httpClient, retryBaseWait, retryMax)
 	server := grpc.NewServer()
 	s := &SpringCloudConfigCSIProviderServer{
 		springCloudConfigClient: &client,
