@@ -59,3 +59,16 @@ spec:
         volumeAttributes:
           secretProviderClass: "spring-cloud-config-<your-application>"
 ```
+
+## Release
+
+Follow these steps to release a new version:
+
+1. Create a new release [via the GitHub UI](https://github.com/freenowtech/secrets-store-csi-driver-provider-spring-cloud-config/releases/new).
+2. Set `v0.x.y` as the tag and the release title.
+   
+   If the release contains at least one feature, increase `x` by one and set `y` to `0`.
+   
+   If the release contains bug fixes only, increase `y` by one.
+3. Let GitHub generate the release notes by clicking the "Generate release notes" button.
+4. Click the "Publish release" button.
