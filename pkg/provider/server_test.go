@@ -51,6 +51,33 @@ func TestSpringCloudConfigCSIProviderServer_Mount(t *testing.T) {
 			wantFiles: map[string]string{"some-testing.json": `{"some":"json"}`},
 		},
 		{
+			name: "When attribute `FileName` is set then it uses the attribute to create the file",
+			configServerRequests: []*configServerRequest{
+				{
+					path:            "/config/some/testing.json",
+					statusCode:      200,
+					responsePayload: `{"some":"json"}`,
+				},
+			},
+			attrib: Attributes{
+				ServerAddress: "http://configserver.localhost",
+				Profile:       "testing",
+				Application:   "some",
+				FileName:      "config.json",
+			},
+			wantFiles: map[string]string{"config.json": `{"some":"json"}`},
+		},
+		{
+			name: "When attribute `FileName` defines an unsupported extension then it errors",
+			attrib: Attributes{
+				ServerAddress: "http://configserver.localhost",
+				Profile:       "testing",
+				Application:   "some",
+				FileName:      "config.toml",
+			},
+			wantError: errors.New("fileName config.toml uses an unsupported extension - supported extensions are .json,.properties,.yaml,.yml"),
+		},
+		{
 			name: "When raw files are part of the attributes then it creates the raw files",
 			configServerRequests: []*configServerRequest{
 				{
@@ -74,7 +101,7 @@ func TestSpringCloudConfigCSIProviderServer_Mount(t *testing.T) {
 				Profile:       "testing",
 				Application:   "some",
 			},
-			wantError: errors.New("FileType and raw are not set, atleast one is required"),
+			wantError: errors.New("attributes fileName, fileType or raw are not set, at least one is required"),
 		},
 		{
 			name: "When ConfigServer returns an error then it errors",

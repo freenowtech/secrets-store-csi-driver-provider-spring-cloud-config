@@ -32,8 +32,7 @@ spec:
     serverAddress: "<your-server-address>" # this url should point config server
     application: "<your-application>" # the application you're retrieving the config for
     profile: "<your-profile>" # the profile for your application to pull
-    fileType: "json" # json or properties viable
-    
+    fileName: "application.yaml"
 ```
 
 Afterwards you can reference your `SecretProviderClass` in your Pod Definition

@@ -9,12 +9,18 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"slices"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 
 	"sigs.k8s.io/secrets-store-csi-driver/provider/v1alpha1"
+)
+
+var (
+	supportedFileExtensions = []string{".json", ".properties", ".yaml", ".yml"}
 )
 
 type SpringCloudConfigCSIProviderServer struct {
@@ -30,6 +36,7 @@ type Attributes struct {
 	ServerAddress string `json:"serverAddress,omitempty"`
 	Application   string `json:"application,omitempty"`
 	Profile       string `json:"profile,omitempty"`
+	FileName      string `json:"fileName,omitempty"`
 	FileType      string `json:"fileType,omitempty"`
 	Raw           string `json:"raw"`
 }
@@ -78,12 +85,30 @@ func (a *Attributes) verify() (err error) {
 		return fmt.Errorf("profile is not set")
 	}
 
-	// TODO might want to warn/info in-case only raw files were created
-	if a.FileType == "" && len(raw) == 0 {
-		return fmt.Errorf("FileType and raw are not set, atleast one is required")
+	if a.FileType == "" && len(raw) == 0 && a.FileName == "" {
+		return fmt.Errorf("attributes fileName, fileType or raw are not set, at least one is required")
+	}
+
+	if a.FileType != "" {
+		log.Warnf("%s/%s specifies deprecated attribute fileType - should use fileName instead", a.Application, a.Profile)
+	}
+
+	if a.FileName != "" {
+		ext := path.Ext(a.FileName)
+		if !slices.Contains(supportedFileExtensions, ext) {
+			return fmt.Errorf("fileName %s uses an unsupported extension - supported extensions are %s", a.FileName, strings.Join(supportedFileExtensions, ","))
+		}
 	}
 
 	return nil
+}
+
+func (a *Attributes) extension() string {
+	if a.FileName != "" {
+		return path.Ext(a.FileName)
+	}
+
+	return "." + a.FileType
 }
 
 // NewSpringCloudConfigCSIProviderServer returns CSI provider that uses the spring as the secret backend
@@ -158,7 +183,7 @@ func (m *SpringCloudConfigCSIProviderServer) Mount(ctx context.Context, req *v1a
 		},
 	}
 
-	if attrib.FileType != "" {
+	if attrib.FileType != "" || attrib.FileName != "" {
 		err = m.mountFile(attrib, req.GetTargetPath(), filePermission)
 		if err != nil {
 			return nil, err
@@ -189,7 +214,13 @@ func (m *SpringCloudConfigCSIProviderServer) Version(ctx context.Context, req *v
 	}, nil
 }
 func (m *SpringCloudConfigCSIProviderServer) mountFile(attrib Attributes, targetPath string, filePermission os.FileMode) error {
-	fileName := fmt.Sprintf("%s-%s.%s", attrib.Application, attrib.Profile, attrib.FileType)
+	var fileName string
+	if attrib.FileName == "" {
+		fileName = fmt.Sprintf("%s-%s.%s", attrib.Application, attrib.Profile, attrib.FileType)
+	} else {
+		fileName = attrib.FileName
+	}
+
 	content, err := m.springCloudConfigClient.GetConfig(attrib)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve secrets for %s: %w", fileName, err)
