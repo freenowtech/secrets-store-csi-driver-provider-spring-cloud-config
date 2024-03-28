@@ -48,7 +48,7 @@ func NewSpringCloudConfigClient(c *http.Client, retryBaseWait time.Duration, ret
 // GetConfig pulls the config from spring-cloud config server and the server parses it to the specified format
 // if the config contains secrets they are decoded on the server side
 func (c *SpringCloudConfigClient) GetConfig(attributes Attributes) (io.ReadCloser, error) {
-	fullAddress := attributes.ServerAddress + springGetConfigPath + attributes.Application + "/" + attributes.Profile + "." + attributes.FileType
+	fullAddress := attributes.ServerAddress + springGetConfigPath + attributes.Application + "/" + attributes.Profile + attributes.extension()
 	req, err := http.NewRequest("GET", fullAddress, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create new GetConfig request: %w", err)
