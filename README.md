@@ -32,7 +32,7 @@ spec:
     serverAddress: "http://configserver.example" # this url should point to config server
     application: "myapp" # the application you're retrieving the config for
     profile: "prod" # the profile for your application to pull
-    fileName: "application.yaml" # the name of the file to create
+    fileName: "application.yaml" # the name of the file to create - supports extensions .yaml, .yml, .json and .properties
 ```
 
 Afterwards you can reference your `SecretProviderClass` in your Pod Definition
