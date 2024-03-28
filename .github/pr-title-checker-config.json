@@ -1,0 +1,13 @@
+{
+  "LABEL": {
+    "name": ""
+  },
+  "CHECKS": {
+    "prefixes": ["bugfix: ", "chore: ", "docs: ", "feature: "]
+  },
+  "MESSAGES": {
+    "success": "All OK",
+    "failure": "Title of pull request must start with bugfix:, chore:, docs: or feature:",
+    "notice": ""
+  }
+}
