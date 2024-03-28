@@ -35,7 +35,7 @@ spec:
     fileName: "application.yaml" # the name of the file to create - supports extensions .yaml, .yml, .json and .properties
 ```
 
-Afterwards you can reference your `SecretProviderClass` in your Pod Definition
+Afterward, reference your `SecretProviderClass` in your Pod Definition
 
 ```yaml
 kind: Pod
@@ -85,7 +85,7 @@ spec:
    ```
 1. In a new terminal window, create the directory `.dev`:
    ```shell
-   mkdir .dev
+   mkdir -p .dev
    ```
 1. Download the grpc protobuf definitions:
    ```shell
@@ -94,15 +94,21 @@ spec:
 1. Create the payload `.dev/mount.json`:
    ```json
    {
-     "attributes": "{\"serverAddress\":\"<your-server-address>\",\"application\":\"<your application>\",\"profile\":\"<your profile>\",\"fileType\":\"json\"}",
+     "attributes": "{\"serverAddress\":\"<your-server-address>\",\"application\":\"<your application>\",\"profile\":\"<your profile>\",\"fileName\":\"application.yaml\"}",
      "secrets": "{}",
      "targetPath": "./.dev",
      "permission": "420"
    }
    ```
+   **Make sure to replace the placeholders**
 1. Send the payload to the provider:
    ```shell
    cat ./.dev/mount.json | grpcurl -unix -plaintext -proto ./.dev/service.proto -d @ ./spring-cloud-config.sock v1alpha1.CSIDriverProvider/Mount
+   ```
+1. Verify that the file has been created:
+   ```shell
+   cat ./.dev/application.yaml
+   # Should display YAML content
    ```
 
 
