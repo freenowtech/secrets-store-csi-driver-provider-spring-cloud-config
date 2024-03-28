@@ -63,6 +63,49 @@ spec:
           secretProviderClass: "spring-cloud-config-example"
 ```
 
+## Development
+
+### Run the binary locally
+
+#### Requirements
+
+- [Go](https://go.dev/doc/install)
+- [gRPCurl](https://github.com/fullstorydev/grpcurl?tab=readme-ov-file#installation)
+
+
+#### Steps to execute
+
+1. Build the binary:
+   ```shell
+   go build
+   ```
+1. Start the binary:
+   ```shell
+   ./secrets-store-csi-driver-provider-spring-cloud-config
+   ```
+1. In a new terminal window, create the directory `.dev`:
+   ```shell
+   mkdir .dev
+   ```
+1. Download the grpc protobuf definitions:
+   ```shell
+   curl -L -o .dev/service.proto https://raw.githubusercontent.com/kubernetes-sigs/secrets-store-csi-driver/main/provider/v1alpha1/service.proto
+   ```
+1. Create the payload `.dev/mount.json`:
+   ```json
+   {
+     "attributes": "{\"serverAddress\":\"<your-server-address>\",\"application\":\"<your application>\",\"profile\":\"<your profile>\",\"fileType\":\"json\"}",
+     "secrets": "{}",
+     "targetPath": "./.dev",
+     "permission": "420"
+   }
+   ```
+1. Send the payload to the provider:
+   ```shell
+   cat ./.dev/mount.json | grpcurl -unix -plaintext -proto ./.dev/service.proto -d @ ./spring-cloud-config.sock v1alpha1.CSIDriverProvider/Mount
+   ```
+
+
 ## Release
 
 Follow these steps to release a new version:
