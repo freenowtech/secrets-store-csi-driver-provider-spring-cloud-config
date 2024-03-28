@@ -25,14 +25,14 @@ Create a `SecretProviderClass` resource to provide Spring-Cloud-Config-specific 
 apiVersion: secrets-store.csi.x-k8s.io/v1alpha1
 kind: SecretProviderClass
 metadata:
-  name: spring-cloud-config-<your-application>
+  name: spring-cloud-config-example
 spec:
   provider: spring-cloud-config
   parameters:
-    serverAddress: "<your-server-address>" # this url should point config server
-    application: "<your-application>" # the application you're retrieving the config for
-    profile: "<your-profile>" # the profile for your application to pull
-    fileName: "application.yaml"
+    serverAddress: "http://configserver.example" # this url should point to config server
+    application: "myapp" # the application you're retrieving the config for
+    profile: "prod" # the profile for your application to pull
+    fileName: "application.yaml" # the name of the file to create
 ```
 
 Afterwards you can reference your `SecretProviderClass` in your Pod Definition
@@ -41,11 +41,15 @@ Afterwards you can reference your `SecretProviderClass` in your Pod Definition
 kind: Pod
 apiVersion: v1
 metadata:
-  name: nginx-secrets-store-inline
+  name: secrets-store-example
 spec:
   containers:
-  - image: nginx
-    name: nginx
+  - image: ubuntu:latest
+    name: ubuntu
+    command: ["/bin/bash"]
+    args:
+      - "-c"
+      - "cat /secrets-store/application.yaml && sleep 300"
     volumeMounts:
     - name: secrets-store-inline
       mountPath: "/secrets-store"
@@ -56,5 +60,5 @@ spec:
         driver: secrets-store.csi.k8s.com
         readOnly: true
         volumeAttributes:
-          secretProviderClass: "spring-cloud-config-<your-application>"
+          secretProviderClass: "spring-cloud-config-example"
 ```
