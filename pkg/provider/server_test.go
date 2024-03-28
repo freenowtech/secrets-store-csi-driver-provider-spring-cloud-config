@@ -68,6 +68,24 @@ func TestSpringCloudConfigCSIProviderServer_Mount(t *testing.T) {
 			wantFiles: map[string]string{"config.json": `{"some":"json"}`},
 		},
 		{
+			name: "When both attributes `FileName` and `FileType` are set then attribute `FileName` takes precedence",
+			configServerRequests: []*configServerRequest{
+				{
+					path:            "/config/some/testing.json",
+					statusCode:      200,
+					responsePayload: `{"some":"json"}`,
+				},
+			},
+			attrib: Attributes{
+				ServerAddress: "http://configserver.localhost",
+				Profile:       "testing",
+				Application:   "some",
+				FileType:      "json",
+				FileName:      "config.json",
+			},
+			wantFiles: map[string]string{"config.json": `{"some":"json"}`},
+		},
+		{
 			name: "When attribute `FileName` defines an unsupported extension then it errors",
 			attrib: Attributes{
 				ServerAddress: "http://configserver.localhost",
